@@ -4,11 +4,12 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record PatientQuestionRequest(
-        @NotBlank(message = "Вопрос пациента обязателен")
-        @Size(max = 2000, message = "Вопрос не должен превышать 2000 символов")
+        @NotBlank(message = "Р’РѕРїСЂРѕСЃ РїР°С†РёРµРЅС‚Р° РѕР±СЏР·Р°С‚РµР»РµРЅ")
+        @Size(max = 2000, message = "Р’РѕРїСЂРѕСЃ РЅРµ РґРѕР»Р¶РµРЅ РїСЂРµРІС‹С€Р°С‚СЊ 2000 СЃРёРјРІРѕР»РѕРІ")
         String patientQuestion,
 
-        @NotBlank(message = "Категория вопроса обязательна")
+        @NotBlank(message = "РљР°С‚РµРіРѕСЂРёСЏ РІРѕРїСЂРѕСЃР° РѕР±СЏР·Р°С‚РµР»СЊРЅР°")
+        @Size(max = 50, message = "РќРµРґРѕРїСѓСЃС‚РёРјР°СЏ РґР»РёРЅР° РєР°С‚РµРіРѕСЂРёРё")
         String category,
 
         @Size(max = 200)

@@ -6,14 +6,14 @@ spring:
     name: medis-ai-assistant
 
 llm:
-  active-provider: gigachat
-  fallback-provider: internal
+  active-provider: ${LLM_ACTIVE_PROVIDER:gigachat}
+  fallback-provider: ${LLM_FALLBACK_PROVIDER:internal}
   gigachat:
     base-url: ${GIGACHAT_BASE_URL:https://gigachat.devices.sberbank.ru}
-    client-id: ${GIGACHAT_CLIENT_ID}
-    client-secret: ${CLIENT_SECRET}
-    access-token: ${GIGACHAT_CREDENTIALS:}
-    model: ${GIGACHAT_MODEL}
+    client-id: ${GIGACHAT_CLIENT_ID:}
+    client-secret: ${GIGACHAT_CLIENT_SECRET:}
+    access-token: ${GIGACHAT_ACCESS_TOKEN:}
+    model: ${GIGACHAT_MODEL:GigaChat}
     timeout: 10s
     retries: 2
   internal:

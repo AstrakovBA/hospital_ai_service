@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.medis.aiassistant.dto.PatientAnswerResponse;
@@ -17,7 +18,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("PatientResponseService — unit-тесты")
+@DisplayName("PatientResponseService вЂ” unit-С‚РµСЃС‚С‹")
 class PatientResponseServiceTest {
 
     @Mock
@@ -27,22 +28,22 @@ class PatientResponseServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PatientResponseService(aiGateway);
+        service = new PatientResponseService(aiGateway, new SimpleMeterRegistry());
     }
 
     @Test
-    @DisplayName("Успешная генерация черновика ответа")
+    @DisplayName("РЈСЃРїРµС€РЅР°СЏ РіРµРЅРµСЂР°С†РёСЏ С‡РµСЂРЅРѕРІРёРєР° РѕС‚РІРµС‚Р°")
     void shouldGenerateDraftAnswerSuccessfully() {
         // given
         PatientQuestionRequest request = new PatientQuestionRequest(
-                "Как перенести запись к терапевту?",
-                "ЗАПИСЬ",
-                "Иванов И.И.",
-                "Поликлиника №5"
+                "РљР°Рє РїРµСЂРµРЅРµСЃС‚Рё Р·Р°РїРёСЃСЊ Рє С‚РµСЂР°РїРµРІС‚Сѓ?",
+                "Р—РђРџРРЎР¬",
+                "РРІР°РЅРѕРІ Р.Р.",
+                "РџРѕР»РёРєР»РёРЅРёРєР° в„–5"
         );
 
         LlmResponse llmResponse = LlmResponse.of(
-                "Здравствуйте, Иван Иванович! Для переноса записи обратитесь в регистратуру.",
+                "Р—РґСЂР°РІСЃС‚РІСѓР№С‚Рµ, РРІР°РЅ РРІР°РЅРѕРІРёС‡! Р”Р»СЏ РїРµСЂРµРЅРѕСЃР° Р·Р°РїРёСЃРё РѕР±СЂР°С‚РёС‚РµСЃСЊ РІ СЂРµРіРёСЃС‚СЂР°С‚СѓСЂСѓ.",
                 "gigachat",
                 250
         );
@@ -52,26 +53,26 @@ class PatientResponseServiceTest {
         PatientAnswerResponse response = service.generateDraftAnswer(request);
 
         // then
-        assertThat(response.draftAnswer()).contains("Иван Иванович");
+        assertThat(response.draftAnswer()).contains("РРІР°РЅ РРІР°РЅРѕРІРёС‡");
         assertThat(response.provider()).isEqualTo("gigachat");
         assertThat(response.fallbackUsed()).isFalse();
-        assertThat(response.disclaimer()).contains("не является медицинской консультацией");
+        assertThat(response.disclaimer()).contains("РЅРµ СЏРІР»СЏРµС‚СЃСЏ РјРµРґРёС†РёРЅСЃРєРѕР№ РєРѕРЅСЃСѓР»СЊС‚Р°С†РёРµР№");
         verify(aiGateway, times(1)).generate(any(LlmRequest.class));
     }
 
     @Test
-    @DisplayName("Fallback при недоступности основного провайдера")
+    @DisplayName("Fallback РїСЂРё РЅРµРґРѕСЃС‚СѓРїРЅРѕСЃС‚Рё РѕСЃРЅРѕРІРЅРѕРіРѕ РїСЂРѕРІР°Р№РґРµСЂР°")
     void shouldUseFallbackWhenProviderFails() {
         // given
         PatientQuestionRequest request = new PatientQuestionRequest(
-                "Какие документы нужны?",
-                "ДОКУМЕНТЫ",
-                "Петрова А.С.",
+                "РљР°РєРёРµ РґРѕРєСѓРјРµРЅС‚С‹ РЅСѓР¶РЅС‹?",
+                "Р”РћРљРЈРњР•РќРўР«",
+                "РџРµС‚СЂРѕРІР° Рђ.РЎ.",
                 null
         );
 
         LlmResponse fallbackResponse = LlmResponse.fallback(
-                "Сервис временно недоступен. Обратитесь в регистратуру.",
+                "РЎРµСЂРІРёСЃ РІСЂРµРјРµРЅРЅРѕ РЅРµРґРѕСЃС‚СѓРїРµРЅ. РћР±СЂР°С‚РёС‚РµСЃСЊ РІ СЂРµРіРёСЃС‚СЂР°С‚СѓСЂСѓ.",
                 "internal"
         );
         when(aiGateway.generate(any(LlmRequest.class))).thenReturn(fallbackResponse);
@@ -85,14 +86,14 @@ class PatientResponseServiceTest {
     }
 
     @Test
-    @DisplayName("Санитизация: ограничение длины ответа")
+    @DisplayName("РЎР°РЅРёС‚РёР·Р°С†РёСЏ: РѕРіСЂР°РЅРёС‡РµРЅРёРµ РґР»РёРЅС‹ РѕС‚РІРµС‚Р°")
     void shouldTruncateLongAnswer() {
         // given
         PatientQuestionRequest request = new PatientQuestionRequest(
-                "Вопрос", "ОБЩЕЕ", null, null
+                "Р’РѕРїСЂРѕСЃ", "РћР‘Р©Р•Р•", null, null
         );
 
-        String longText = "А".repeat(1500);
+        String longText = "Рђ".repeat(1500);
         LlmResponse llmResponse = LlmResponse.of(longText, "gigachat", 100);
         when(aiGateway.generate(any(LlmRequest.class))).thenReturn(llmResponse);
 
@@ -104,14 +105,14 @@ class PatientResponseServiceTest {
     }
 
     @Test
-    @DisplayName("Санитизация: удаление медицинских назначений")
+    @DisplayName("РЎР°РЅРёС‚РёР·Р°С†РёСЏ: СѓРґР°Р»РµРЅРёРµ РјРµРґРёС†РёРЅСЃРєРёС… РЅР°Р·РЅР°С‡РµРЅРёР№")
     void shouldRemoveMedicalPrescriptions() {
         // given
         PatientQuestionRequest request = new PatientQuestionRequest(
-                "Вопрос", "ОБЩЕЕ", null, null
+                "Р’РѕРїСЂРѕСЃ", "РћР‘Р©Р•Р•", null, null
         );
 
-        String dangerousText = "Примите 500 мг парацетамола. Диагноз: ОРВИ.";
+        String dangerousText = "РџСЂРёРјРёС‚Рµ 500 РјРі РїР°СЂР°С†РµС‚Р°РјРѕР»Р°. Р”РёР°РіРЅРѕР·: РћР Р’Р.";
         LlmResponse llmResponse = LlmResponse.of(dangerousText, "gigachat", 100);
         when(aiGateway.generate(any(LlmRequest.class))).thenReturn(llmResponse);
 
@@ -119,16 +120,16 @@ class PatientResponseServiceTest {
         PatientAnswerResponse response = service.generateDraftAnswer(request);
 
         // then
-        assertThat(response.draftAnswer()).doesNotContain("Примите 500 мг");
-        assertThat(response.draftAnswer()).doesNotContain("Диагноз:");
+        assertThat(response.draftAnswer()).doesNotContain("РџСЂРёРјРёС‚Рµ 500 РјРі");
+        assertThat(response.draftAnswer()).doesNotContain("Р”РёР°РіРЅРѕР·:");
     }
 
     @Test
-    @DisplayName("Пустой ответ от LLM ? fallback-сообщение")
+    @DisplayName("РџСѓСЃС‚РѕР№ РѕС‚РІРµС‚ РѕС‚ LLM ? fallback-СЃРѕРѕР±С‰РµРЅРёРµ")
     void shouldHandleEmptyLlmResponse() {
         // given
         PatientQuestionRequest request = new PatientQuestionRequest(
-                "Вопрос", "ОБЩЕЕ", null, null
+                "Р’РѕРїСЂРѕСЃ", "РћР‘Р©Р•Р•", null, null
         );
 
         LlmResponse emptyResponse = LlmResponse.of("", "gigachat", 50);
@@ -138,22 +139,22 @@ class PatientResponseServiceTest {
         PatientAnswerResponse response = service.generateDraftAnswer(request);
 
         // then
-        assertThat(response.draftAnswer()).contains("не удалось сформировать ответ");
+        assertThat(response.draftAnswer()).contains("РЅРµ СѓРґР°Р»РѕСЃСЊ СЃС„РѕСЂРјРёСЂРѕРІР°С‚СЊ РѕС‚РІРµС‚");
     }
 
     @Test
-    @DisplayName("Prompt содержит системные ограничения")
+    @DisplayName("Prompt СЃРѕРґРµСЂР¶РёС‚ СЃРёСЃС‚РµРјРЅС‹Рµ РѕРіСЂР°РЅРёС‡РµРЅРёСЏ")
     void shouldIncludeGuardrailsInPrompt() {
         // given
         PatientQuestionRequest request = new PatientQuestionRequest(
-                "Как записаться?", "ЗАПИСЬ", null, null
+                "РљР°Рє Р·Р°РїРёСЃР°С‚СЊСЃСЏ?", "Р—РђРџРРЎР¬", null, null
         );
 
         when(aiGateway.generate(any(LlmRequest.class))).thenAnswer(invocation -> {
             LlmRequest llmRequest = invocation.getArgument(0);
-            assertThat(llmRequest.systemPrompt()).contains("НИКОГДА не давай медицинских назначений");
+            assertThat(llmRequest.systemPrompt()).contains("РќРРљРћР“Р”Рђ РЅРµ РґР°РІР°Р№ РјРµРґРёС†РёРЅСЃРєРёС… РЅР°Р·РЅР°С‡РµРЅРёР№");
             assertThat(llmRequest.temperature()).isEqualTo(0.3);
-            return LlmResponse.of("Ответ", "gigachat", 100);
+            return LlmResponse.of("РћС‚РІРµС‚", "gigachat", 100);
         });
 
         // when

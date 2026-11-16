@@ -17,7 +17,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AiGateway — unit-тесты")
+@DisplayName("AiGateway вЂ” unit-С‚РµСЃС‚С‹")
 class AiGatewayTest {
 
     @Mock
@@ -46,7 +46,7 @@ class AiGatewayTest {
     }
 
     @Test
-    @DisplayName("Успешная маршрутизация к активному провайдеру")
+    @DisplayName("РЈСЃРїРµС€РЅР°СЏ РјР°СЂС€СЂСѓС‚РёР·Р°С†РёСЏ Рє Р°РєС‚РёРІРЅРѕРјСѓ РїСЂРѕРІР°Р№РґРµСЂСѓ")
     void shouldRouteToActiveProvider() {
         LlmRequest request = LlmRequest.builder()
                 .userPrompt("test")
@@ -63,7 +63,7 @@ class AiGatewayTest {
     }
 
     @Test
-    @DisplayName("Fallback при ошибке основного провайдера")
+    @DisplayName("Fallback РїСЂРё РѕС€РёР±РєРµ РѕСЃРЅРѕРІРЅРѕРіРѕ РїСЂРѕРІР°Р№РґРµСЂР°")
     void shouldFallbackOnPrimaryFailure() {
         LlmRequest request = LlmRequest.builder().userPrompt("test").build();
         when(gigachatClient.generate(any()))
@@ -78,7 +78,7 @@ class AiGatewayTest {
     }
 
     @Test
-    @DisplayName("Безопасный ответ при отказе обоих провайдеров")
+    @DisplayName("Р‘РµР·РѕРїР°СЃРЅС‹Р№ РѕС‚РІРµС‚ РїСЂРё РѕС‚РєР°Р·Рµ РѕР±РѕРёС… РїСЂРѕРІР°Р№РґРµСЂРѕРІ")
     void shouldReturnSafeMessageWhenAllFail() {
         LlmRequest request = LlmRequest.builder().userPrompt("test").build();
         when(gigachatClient.generate(any()))
@@ -89,6 +89,6 @@ class AiGatewayTest {
         LlmResponse result = aiGateway.generate(request);
 
         assertThat(result.fallbackUsed()).isTrue();
-        assertThat(result.text()).contains("временно недоступен");
+        assertThat(result.text()).contains("РІСЂРµРјРµРЅРЅРѕ РЅРµРґРѕСЃС‚СѓРїРµРЅ");
     }
 }

@@ -1,7 +1,7 @@
 package ru.medis.aiassistant.llm;
 
 /**
- * Универсальный ответ от LLM.
+ * РЈРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ РѕС‚РІРµС‚ РѕС‚ LLM.
  */
 public record LlmResponse(
         String text,

@@ -9,8 +9,8 @@ import ru.medis.aiassistant.dto.PatientQuestionRequest;
 import ru.medis.aiassistant.service.PatientResponseService;
 
 /**
- * REST-контроллер для генерации черновика ответа пациенту.
- * Контроллер НЕ вызывает LLM напрямую — только через Service.
+ * REST-РєРѕРЅС‚СЂРѕР»Р»РµСЂ РґР»СЏ РіРµРЅРµСЂР°С†РёРё С‡РµСЂРЅРѕРІРёРєР° РѕС‚РІРµС‚Р° РїР°С†РёРµРЅС‚Сѓ.
+ * РљРѕРЅС‚СЂРѕР»Р»РµСЂ РќР• РІС‹Р·С‹РІР°РµС‚ LLM РЅР°РїСЂСЏРјСѓСЋ вЂ” С‚РѕР»СЊРєРѕ С‡РµСЂРµР· Service.
  */
 @RestController
 @RequestMapping("/api/v1/patient")

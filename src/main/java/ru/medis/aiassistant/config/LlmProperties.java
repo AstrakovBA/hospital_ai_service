@@ -1,5 +1,8 @@
 package ru.medis.aiassistant.config;
 
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -9,10 +12,28 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "llm")
 public class LlmProperties {
 
+    private static final Logger log = LoggerFactory.getLogger(LlmProperties.class);
+
     private String activeProvider = "gigachat";
     private String fallbackProvider = "internal";
     private GigachatProperties gigachat = new GigachatProperties();
     private InternalProperties internal = new InternalProperties();
+
+    /**
+     * Проверка конфигурации на старте. Секреты читаются только из переменных окружения,
+     * их значения в логи не выводятся.
+     */
+    @PostConstruct
+    void validate() {
+        if (activeProvider == null || activeProvider.isBlank()) {
+            throw new IllegalStateException("llm.active-provider must be configured");
+        }
+        if ("gigachat".equals(activeProvider)
+                && (gigachat.accessToken == null || gigachat.accessToken.isBlank())) {
+            log.warn("GigaChat selected as active provider but GIGACHAT_ACCESS_TOKEN is not set — "
+                    + "requests will fail and the gateway will fall back to '{}'", fallbackProvider);
+        }
+    }
 
     // getters/setters...
 
@@ -29,7 +50,7 @@ public class LlmProperties {
         private String baseUrl;
         private String clientId;
         private String clientSecret;
-        private String accessToken; // ������������ ����� OAuth
+        private String accessToken; // генерируется через OAuth
         private String model = "GigaChat";
         private Duration timeout = Duration.ofSeconds(10);
         private int retries = 2;
