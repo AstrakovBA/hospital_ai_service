@@ -31,13 +31,16 @@ public class GigaChatLlmClient implements LlmClient {
 
     private final RestClient restClient;
     private final LlmProperties properties;
+    private final GigaChatAccessTokenProvider tokenProvider;
     private final Timer requestTimer;
 
     public GigaChatLlmClient(RestClient gigachatRestClient,
                              LlmProperties properties,
+                             GigaChatAccessTokenProvider tokenProvider,
                              MeterRegistry meterRegistry) {
         this.restClient = gigachatRestClient;
         this.properties = properties;
+        this.tokenProvider = tokenProvider;
         this.requestTimer = Timer.builder("llm.request.duration")
                 .tag("provider", PROVIDER_NAME)
                 .description("Время запроса к LLM")
@@ -62,7 +65,7 @@ public class GigaChatLlmClient implements LlmClient {
 
                 return restClient.post()
                         .uri("/api/v1/chat/completions")
-                        .header("Authorization", "Bearer " + properties.getGigachat().getAccessToken())
+                        .header("Authorization", "Bearer " + tokenProvider.getAccessToken())
                         .header("X-Session-ID", sessionId)
                         .header("Content-Type", "application/json")
                         .body(body)
@@ -97,7 +100,7 @@ public class GigaChatLlmClient implements LlmClient {
             // Lightweight health check
             restClient.get()
                     .uri("/api/v1/models")
-                    .header("Authorization", "Bearer " + properties.getGigachat().getAccessToken())
+                    .header("Authorization", "Bearer " + tokenProvider.getAccessToken())
                     .retrieve()
                     .toBodilessEntity();
             return true;
