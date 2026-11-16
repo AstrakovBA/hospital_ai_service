@@ -1,5 +1,8 @@
 package ru.medis.aiassistant.service;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -10,7 +13,9 @@ import ru.medis.aiassistant.llm.AiGateway;
 import ru.medis.aiassistant.llm.LlmRequest;
 import ru.medis.aiassistant.llm.LlmResponse;
 
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Service
 public class PatientResponseService {
@@ -18,24 +23,53 @@ public class PatientResponseService {
     private static final Logger log = LoggerFactory.getLogger(PatientResponseService.class);
     private static final int MAX_ANSWER_LENGTH = 800;
 
-    private final AiGateway aiGateway;
+    /**
+     * РћРїР°СЃРЅС‹Рµ РјРµРґРёС†РёРЅСЃРєРёРµ РїР°С‚С‚РµСЂРЅС‹, РєРѕС‚РѕСЂС‹Рµ РЅРµ РґРѕР»Р¶РЅС‹ РїРѕРїР°РґР°С‚СЊ РІ С‡РµСЂРЅРѕРІРёРє РѕС‚РІРµС‚Р°:
+     * РґРёР°РіРЅРѕР·С‹, РЅР°Р·РЅР°С‡РµРЅРёСЏ Рё РґРѕР·РёСЂРѕРІРєРё.
+     */
+    private static final List<Pattern> DANGEROUS_PATTERNS = List.of(
+            // "РґРёР°РіРЅРѕР·: ...", "Сѓ РІР°СЃ: ..." вЂ” С„РѕСЂРјСѓР»РёСЂРѕРІРєРё РґРёР°РіРЅРѕР·Р°
+            Pattern.compile("(?i)\\b(РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅС‹Р№\\s+)?(РґРёР°РіРЅРѕР·|Сѓ\\s+РІР°СЃ|РІР°Рј\\s+РїРѕСЃС‚Р°РІРёР»Рё)\\s*:?\\s*[^.;\\n]*[.;]?"),
+            // "РЅР°Р·РЅР°С‡РµРЅРёСЏ:", "Р»РµС‡РµРЅРёРµ:", "СЂРµРєРѕРјРµРЅРґРѕРІР°РЅРѕ:" вЂ” Р±Р»РѕРєРё РЅР°Р·РЅР°С‡РµРЅРёР№
+            Pattern.compile("(?i)\\b(РЅР°Р·РЅР°С‡РµРЅРё(Рµ|СЏ)|Р»РµС‡РµРЅРё(Рµ|РµРј)|СЃС…РµРјР°\\s+РїСЂРёС‘РјР°|СЂРµРєРѕРјРµРЅРґРѕРІР°РЅ(Рѕ|С‹))\\s*:?\\s*[^.;\\n]*[.;]?"),
+            // РџСЂСЏРјС‹Рµ СѓРєР°Р·Р°РЅРёСЏ РїСЂРёРЅСЏС‚СЊ РїСЂРµРїР°СЂР°С‚ СЃ РґРѕР·РѕР№: "РїСЂРёРјРёС‚Рµ 500 РјРі Р°РјРѕРєСЃРёРєР»Р°РІР°"
+            Pattern.compile("(?i)\\b(РїСЂРёРЅРёРјР°С‚СЊ|РїСЂРёРјРёС‚Рµ|РІС‹РїРµР№С‚Рµ|СѓРєРѕР»РёС‚Рµ|РєР°РїР°Р№С‚Рµ)\\b[^.;\\n]*"),
+            // Р”РѕР·РёСЂРѕРІРєРё: "РїРѕ 250 РјРі 3 СЂР°Р·Р° РІ РґРµРЅСЊ", "10 РјР»", "2 С‚Р°Р±Р»РµС‚РєРё"
+            Pattern.compile("(?i)\\b(РїРѕ\\s+)?\\d+([.,]\\d+)?\\s*(РјРі|РјР»|РјРєРі|Рі|С‚Р°Р±Р»РµС‚Рє|РєР°РїР»|СѓРєРѕР»|СЂР°Р·(?:Р°)?\\s+РІ\\s+(?:РґРµРЅСЊ|РЅРµРґРµР»СЋ))\\b[^.;\\n]*"),
+            // РќР°Р·РІР°РЅРёСЏ РїСЂРµРїР°СЂР°С‚РѕРІ СЃ С„РѕСЂРјРѕР№ РІС‹РїСѓСЃРєР° (С‡Р°СЃС‚Рѕ РІСЃС‚СЂРµС‡Р°СЋС‚СЃСЏ РІ РіР°Р»Р»СЋС†РёРЅР°С†РёСЏС… РјРѕРґРµР»Рё)
+            Pattern.compile("(?i)\\b(С‚Р°Р±Р»РµС‚Рє|РєР°РїСЃСѓР»|РёРЅСЉРµРєС†|СЂР°СЃС‚РІРѕСЂ|СЃРёСЂРѕРї|РјР°Р·)[Р°-СЏС‘]*\\s*(\\#\\s*\\d+)?")
+    );
 
-    public PatientResponseService(AiGateway aiGateway) {
+    private final AiGateway aiGateway;
+    private final MeterRegistry meterRegistry;
+    private final Timer draftTimer;
+    private final Counter sanitizedCounter;
+
+    public PatientResponseService(AiGateway aiGateway, MeterRegistry meterRegistry) {
         this.aiGateway = aiGateway;
+        this.meterRegistry = meterRegistry;
+        this.draftTimer = Timer.builder("draft.answer.duration")
+                .description("Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ РіРµРЅРµСЂР°С†РёРё С‡РµСЂРЅРѕРІРёРєР° РѕС‚РІРµС‚Р°")
+                .register(meterRegistry);
+        this.sanitizedCounter = Counter.builder("draft.answer.sanitized")
+                .description("РЎРєРѕР»СЊРєРѕ СЂР°Р· СЃР°РЅРёС‚РёР·Р°С†РёСЏ РёР·РјРµРЅРёР»Р° РѕС‚РІРµС‚ РјРѕРґРµР»Рё")
+                .register(meterRegistry);
     }
 
     public PatientAnswerResponse generateDraftAnswer(PatientQuestionRequest request) {
+        // Р’ Р»РѕРіРё РїРѕРїР°РґР°РµС‚ С‚РѕР»СЊРєРѕ РєР°С‚РµРіРѕСЂРёСЏ Рё РґР»РёРЅР° РІРѕРїСЂРѕСЃР° вЂ” Р±РµР· С‚РµРєСЃС‚Р° Рё РџР” РїР°С†РёРµРЅС‚Р°
         log.info("Generating draft answer | category={} | questionLength={}",
                 request.category(), request.patientQuestion().length());
+        long startNanos = System.nanoTime();
 
-        // Валидация категории
+        // Р’Р°Р»РёРґР°С†РёСЏ РєР°С‚РµРіРѕСЂРёРё
         QuestionCategory category = QuestionCategory.fromString(request.category());
 
-        // Формирование запроса к LLM
+        // Р¤РѕСЂРјРёСЂРѕРІР°РЅРёРµ Р·Р°РїСЂРѕСЃР° Рє LLM
         LlmRequest llmRequest = LlmRequest.builder()
                 .systemPrompt(buildSystemPrompt())
                 .userPrompt(buildUserPrompt(request, category))
-                .temperature(0.3) // низкая температура для предсказуемости
+                .temperature(0.3) // РЅРёР·РєР°СЏ С‚РµРјРїРµСЂР°С‚СѓСЂР° РґР»СЏ РїСЂРµРґСЃРєР°Р·СѓРµРјРѕСЃС‚Рё
                 .maxTokens(600)
                 .metadata(Map.of(
                         "category", category.name(),
@@ -43,11 +77,22 @@ public class PatientResponseService {
                 ))
                 .build();
 
-        // Вызов через AiGateway (бизнес-логика НЕ знает о провайдере)
+        // Р’С‹Р·РѕРІ С‡РµСЂРµР· AiGateway (Р±РёР·РЅРµСЃ-Р»РѕРіРёРєР° РќР• Р·РЅР°РµС‚ Рѕ РїСЂРѕРІР°Р№РґРµСЂРµ)
         LlmResponse llmResponse = aiGateway.generate(llmRequest);
 
-        // Постобработка: санитизация и формирование ответа
-        String sanitizedAnswer = sanitize(llmResponse.text());
+        // РџРѕСЃС‚РѕР±СЂР°Р±РѕС‚РєР°: СЃР°РЅРёС‚РёР·Р°С†РёСЏ Рё С„РѕСЂРјРёСЂРѕРІР°РЅРёРµ РѕС‚РІРµС‚Р°
+        String rawAnswer = llmResponse.text();
+        String sanitizedAnswer = sanitize(rawAnswer);
+        if (!sanitizedAnswer.equals(rawAnswer == null ? "" : rawAnswer.strip())) {
+            sanitizedCounter.increment();
+            log.warn("Dangerous medical patterns removed from model answer | requestId={} | provider={}",
+                    llmRequest.metadata().get("requestId"), llmResponse.provider());
+        }
+
+        meterRegistry.counter("draft.answer.total",
+                "provider", llmResponse.provider(),
+                "fallback", String.valueOf(llmResponse.fallbackUsed())).increment();
+        draftTimer.record(java.time.Duration.ofNanos(System.nanoTime() - startNanos));
 
         return new PatientAnswerResponse(
                 sanitizedAnswer,
@@ -59,62 +104,74 @@ public class PatientResponseService {
     }
 
     /**
-     * Системный prompt: жёсткие ограничения для медицинской области.
+     * РЎРёСЃС‚РµРјРЅС‹Р№ prompt: Р¶С‘СЃС‚РєРёРµ РѕРіСЂР°РЅРёС‡РµРЅРёСЏ РґР»СЏ РјРµРґРёС†РёРЅСЃРєРѕР№ РѕР±Р»Р°СЃС‚Рё.
      */
     private String buildSystemPrompt() {
         return """
-                Ты — ассистент регистратуры медицинской организации.
-                Твоя задача — помогать пациентам с ОРГАНИЗАЦИОННЫМИ вопросами.
+                РўС‹ вЂ” Р°СЃСЃРёСЃС‚РµРЅС‚ СЂРµРіРёСЃС‚СЂР°С‚СѓСЂС‹ РјРµРґРёС†РёРЅСЃРєРѕР№ РѕСЂРіР°РЅРёР·Р°С†РёРё.
+                РўРІРѕСЏ Р·Р°РґР°С‡Р° вЂ” РїРѕРјРѕРіР°С‚СЊ РїР°С†РёРµРЅС‚Р°Рј СЃ РћР Р“РђРќРР—РђР¦РРћРќРќР«РњР РІРѕРїСЂРѕСЃР°РјРё.
                 
-                СТРОГИЕ ОГРАНИЧЕНИЯ:
-                1. НИКОГДА не давай медицинских назначений, диагнозов, рекомендаций по лечению.
-                2. НЕ интерпретируй результаты анализов.
-                3. НЕ рекомендуй лекарственные препараты.
-                4. Если вопрос медицинский — перенаправь к врачу.
-                5. Отвечай вежливо, кратко, структурировано.
-                6. Не выдумывай факты. Если не знаешь — скажи, что вопрос передан специалисту.
-                7. Обращайся к пациенту по имени, если оно указано.
+                РЎРўР РћР“РР• РћР“Р РђРќРР§Р•РќРРЇ:
+                1. РќРРљРћР“Р”Рђ РЅРµ РґР°РІР°Р№ РјРµРґРёС†РёРЅСЃРєРёС… РЅР°Р·РЅР°С‡РµРЅРёР№, РґРёР°РіРЅРѕР·РѕРІ, СЂРµРєРѕРјРµРЅРґР°С†РёР№ РїРѕ Р»РµС‡РµРЅРёСЋ.
+                2. РќР• РёРЅС‚РµСЂРїСЂРµС‚РёСЂСѓР№ СЂРµР·СѓР»СЊС‚Р°С‚С‹ Р°РЅР°Р»РёР·РѕРІ.
+                3. РќР• СЂРµРєРѕРјРµРЅРґСѓР№ Р»РµРєР°СЂСЃС‚РІРµРЅРЅС‹Рµ РїСЂРµРїР°СЂР°С‚С‹.
+                4. Р•СЃР»Рё РІРѕРїСЂРѕСЃ РјРµРґРёС†РёРЅСЃРєРёР№ вЂ” РїРµСЂРµРЅР°РїСЂР°РІСЊ Рє РІСЂР°С‡Сѓ.
+                5. РћС‚РІРµС‡Р°Р№ РІРµР¶Р»РёРІРѕ, РєСЂР°С‚РєРѕ, СЃС‚СЂСѓРєС‚СѓСЂРёСЂРѕРІР°РЅРѕ.
+                6. РќРµ РІС‹РґСѓРјС‹РІР°Р№ С„Р°РєС‚С‹. Р•СЃР»Рё РЅРµ Р·РЅР°РµС€СЊ вЂ” СЃРєР°Р¶Рё, С‡С‚Рѕ РІРѕРїСЂРѕСЃ РїРµСЂРµРґР°РЅ СЃРїРµС†РёР°Р»РёСЃС‚Сѓ.
+                7. РћР±СЂР°С‰Р°Р№СЃСЏ Рє РїР°С†РёРµРЅС‚Сѓ РїРѕ РёРјРµРЅРё, РµСЃР»Рё РѕРЅРѕ СѓРєР°Р·Р°РЅРѕ.
                 """;
     }
 
     /**
-     * Пользовательский prompt с контекстом.
+     * РџРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёР№ prompt СЃ РєРѕРЅС‚РµРєСЃС‚РѕРј.
      */
     private String buildUserPrompt(PatientQuestionRequest request, QuestionCategory category) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Категория вопроса: ").append(category.getDescription()).append("\n");
+        sb.append("РљР°С‚РµРіРѕСЂРёСЏ РІРѕРїСЂРѕСЃР°: ").append(category.getDescription()).append("\n");
 
         if (request.patientName() != null && !request.patientName().isBlank()) {
-            sb.append("Имя пациента: ").append(request.patientName()).append("\n");
+            sb.append("РРјСЏ РїР°С†РёРµРЅС‚Р°: ").append(request.patientName()).append("\n");
         }
         if (request.clinicName() != null && !request.clinicName().isBlank()) {
-            sb.append("Медицинская организация: ").append(request.clinicName()).append("\n");
+            sb.append("РњРµРґРёС†РёРЅСЃРєР°СЏ РѕСЂРіР°РЅРёР·Р°С†РёСЏ: ").append(request.clinicName()).append("\n");
         }
 
-        sb.append("Вопрос пациента: ").append(request.patientQuestion()).append("\n");
-        sb.append("\nСгенерируй вежливый черновик ответа для оператора.");
+        sb.append("Р’РѕРїСЂРѕСЃ РїР°С†РёРµРЅС‚Р°: ").append(request.patientQuestion()).append("\n");
+        sb.append("\nРЎРіРµРЅРµСЂРёСЂСѓР№ РІРµР¶Р»РёРІС‹Р№ С‡РµСЂРЅРѕРІРёРє РѕС‚РІРµС‚Р° РґР»СЏ РѕРїРµСЂР°С‚РѕСЂР°.");
         return sb.toString();
     }
 
     /**
-     * Санитизация ответа: ограничение длины, удаление опасных паттернов.
+     * РЎР°РЅРёС‚РёР·Р°С†РёСЏ РѕС‚РІРµС‚Р°: РѕРіСЂР°РЅРёС‡РµРЅРёРµ РґР»РёРЅС‹, СѓРґР°Р»РµРЅРёРµ РѕРїР°СЃРЅС‹С… РјРµРґРёС†РёРЅСЃРєРёС… РїР°С‚С‚РµСЂРЅРѕРІ
+     * (РЅР°Р·РЅР°С‡РµРЅРёСЏ, РґРѕР·РёСЂРѕРІРєРё, С„РѕСЂРјСѓР»РёСЂРѕРІРєРё РґРёР°РіРЅРѕР·РѕРІ).
      */
     private String sanitize(String text) {
         if (text == null || text.isBlank()) {
-            return "К сожалению, не удалось сформировать ответ. Пожалуйста, обратитесь в регистратуру.";
+            return "Рљ СЃРѕР¶Р°Р»РµРЅРёСЋ, РЅРµ СѓРґР°Р»РѕСЃСЊ СЃС„РѕСЂРјРёСЂРѕРІР°С‚СЊ РѕС‚РІРµС‚. РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РѕР±СЂР°С‚РёС‚РµСЃСЊ РІ СЂРµРіРёСЃС‚СЂР°С‚СѓСЂСѓ.";
         }
 
         String sanitized = text.strip();
 
-        // Ограничение длины
+        // РћРіСЂР°РЅРёС‡РµРЅРёРµ РґР»РёРЅС‹
         if (sanitized.length() > MAX_ANSWER_LENGTH) {
             sanitized = sanitized.substring(0, MAX_ANSWER_LENGTH) + "...";
         }
 
-        // Удаление потенциально опасных паттернов (упоминание доз, препаратов)
-        sanitized = sanitized.replaceAll("(?i)(примите|выпейте|уколите)\\s+\\d+\\s*(мг|мл|таблетк)", "");
-        sanitized = sanitized.replaceAll("(?i)(диагноз|у вас)\\s*:", "");
+        // РЈРґР°Р»РµРЅРёРµ РїРѕС‚РµРЅС†РёР°Р»СЊРЅРѕ РѕРїР°СЃРЅС‹С… РїР°С‚С‚РµСЂРЅРѕРІ (РґРѕР·С‹, РЅР°Р·РЅР°С‡РµРЅРёСЏ, РґРёР°РіРЅРѕР·С‹)
+        for (Pattern pattern : DANGEROUS_PATTERNS) {
+            sanitized = pattern.matcher(sanitized).replaceAll("");
+        }
 
-        return sanitized.strip();
+        // РЎС…Р»РѕРїС‹РІР°РЅРёРµ Р°СЂС‚РµС„Р°РєС‚РѕРІ РїРѕСЃР»Рµ СѓРґР°Р»РµРЅРёСЏ С„СЂР°РіРјРµРЅС‚РѕРІ
+        sanitized = sanitized.replaceAll("[ \\t]{2,}", " ")
+                .replaceAll("(?m)^\\s*$\\n", "")
+                .strip();
+
+        if (sanitized.isEmpty()) {
+            return "Рљ СЃРѕР¶Р°Р»РµРЅРёСЋ, СЃРіРµРЅРµСЂРёСЂРѕРІР°РЅРЅС‹Р№ РѕС‚РІРµС‚ СЃРѕРґРµСЂР¶Р°Р» РЅРµРґРѕРїСѓСЃС‚РёРјС‹Рµ РјРµРґРёС†РёРЅСЃРєРёРµ С„РѕСЂРјСѓР»РёСЂРѕРІРєРё "
+                    + "Рё Р±С‹Р» Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ. РџРѕР¶Р°Р»СѓР№СЃС‚Р°, СѓС‚РѕС‡РЅРёС‚Рµ РІРѕРїСЂРѕСЃ РІ СЂРµРіРёСЃС‚СЂР°С‚СѓСЂРµ.";
+        }
+
+        return sanitized;
     }
 }

@@ -1,0 +1,9 @@
+# Локальный профиль: работа без внешних зависимостей (без реального GigaChat API).
+# Запуск: SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run
+llm:
+  active-provider: internal
+  fallback-provider: internal
+
+logging:
+  level:
+    ru.medis.aiassistant: DEBUG

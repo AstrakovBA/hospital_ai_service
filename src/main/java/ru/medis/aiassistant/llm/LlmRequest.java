@@ -3,7 +3,7 @@ package ru.medis.aiassistant.llm;
 import java.util.Map;
 
 /**
- * Универсальный запрос к LLM (не привязан к конкретному провайдеру).
+ * РЈРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ Р·Р°РїСЂРѕСЃ Рє LLM (РЅРµ РїСЂРёРІСЏР·Р°РЅ Рє РєРѕРЅРєСЂРµС‚РЅРѕРјСѓ РїСЂРѕРІР°Р№РґРµСЂСѓ).
  */
 public record LlmRequest(
         String systemPrompt,

@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.medis.aiassistant.llm.AiGateway;
@@ -18,27 +18,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@DisplayName("Интеграционные тесты")
+@DisplayName("РРЅС‚РµРіСЂР°С†РёРѕРЅРЅС‹Рµ С‚РµСЃС‚С‹")
 class PatientResponseIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private AiGateway aiGateway;
 
     @Test
-    @DisplayName("POST /api/v1/patient/draft-answer — успешный ответ")
+    @DisplayName("POST /api/v1/patient/draft-answer вЂ” СѓСЃРїРµС€РЅС‹Р№ РѕС‚РІРµС‚")
     void shouldReturnDraftAnswer() throws Exception {
         when(aiGateway.generate(any()))
-                .thenReturn(LlmResponse.of("Здравствуйте! Для записи...", "gigachat", 200));
+                .thenReturn(LlmResponse.of("Р—РґСЂР°РІСЃС‚РІСѓР№С‚Рµ! Р”Р»СЏ Р·Р°РїРёСЃРё...", "gigachat", 200));
 
         String json = """
                 {
-                  "patientQuestion": "Как записаться к врачу?",
-                  "category": "ЗАПИСЬ",
-                  "patientName": "Иванов И.И.",
-                  "clinicName": "Поликлиника №5"
+                  "patientQuestion": "РљР°Рє Р·Р°РїРёСЃР°С‚СЊСЃСЏ Рє РІСЂР°С‡Сѓ?",
+                  "category": "Р—РђРџРРЎР¬",
+                  "patientName": "РРІР°РЅРѕРІ Р.Р.",
+                  "clinicName": "РџРѕР»РёРєР»РёРЅРёРєР° в„–5"
                 }
                 """;
 
@@ -52,12 +52,12 @@ class PatientResponseIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/patient/draft-answer — валидация пустого вопроса")
+    @DisplayName("POST /api/v1/patient/draft-answer вЂ” РІР°Р»РёРґР°С†РёСЏ РїСѓСЃС‚РѕРіРѕ РІРѕРїСЂРѕСЃР°")
     void shouldRejectEmptyQuestion() throws Exception {
         String json = """
                 {
                   "patientQuestion": "",
-                  "category": "ЗАПИСЬ"
+                  "category": "Р—РђРџРРЎР¬"
                 }
                 """;
 

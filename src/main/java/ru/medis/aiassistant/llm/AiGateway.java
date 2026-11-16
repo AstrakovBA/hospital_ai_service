@@ -8,19 +8,20 @@ import org.springframework.stereotype.Component;
 import ru.medis.aiassistant.config.LlmProperties;
 import ru.medis.aiassistant.exception.LlmUnavailableException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * AI Gateway — единая точка доступа к LLM-провайдерам.
+ * AI Gateway вЂ” РµРґРёРЅР°СЏ С‚РѕС‡РєР° РґРѕСЃС‚СѓРїР° Рє LLM-РїСЂРѕРІР°Р№РґРµСЂР°Рј.
  *
- * Задачи:
- * 1. Маршрутизация запросов к активному провайдеру
- * 2. Fallback при ошибке основного провайдера
- * 3. Метрики и логирование (без чувствительных данных)
- * 4. Изоляция бизнес-логики от конкретного провайдера (анти-vendor-lock)
+ * Р—Р°РґР°С‡Рё:
+ * 1. РњР°СЂС€СЂСѓС‚РёР·Р°С†РёСЏ Р·Р°РїСЂРѕСЃРѕРІ Рє Р°РєС‚РёРІРЅРѕРјСѓ РїСЂРѕРІР°Р№РґРµСЂСѓ
+ * 2. Fallback РїСЂРё РѕС€РёР±РєРµ РѕСЃРЅРѕРІРЅРѕРіРѕ РїСЂРѕРІР°Р№РґРµСЂР°
+ * 3. РњРµС‚СЂРёРєРё Рё Р»РѕРіРёСЂРѕРІР°РЅРёРµ (Р±РµР· С‡СѓРІСЃС‚РІРёС‚РµР»СЊРЅС‹С… РґР°РЅРЅС‹С…)
+ * 4. РР·РѕР»СЏС†РёСЏ Р±РёР·РЅРµСЃ-Р»РѕРіРёРєРё РѕС‚ РєРѕРЅРєСЂРµС‚РЅРѕРіРѕ РїСЂРѕРІР°Р№РґРµСЂР° (Р°РЅС‚Рё-vendor-lock)
  */
 @Component
 public class AiGateway {
@@ -34,7 +35,7 @@ public class AiGateway {
     // Circuit breaker state
     private volatile boolean primaryFailed = false;
     private volatile long primaryFailureTimestamp = 0;
-    private static final long CIRCUIT_BREAKER_TIMEOUT_MS = 30_000; // 30 сек
+    private static final long CIRCUIT_BREAKER_TIMEOUT_MS = 30_000; // 30 СЃРµРє
 
     public AiGateway(List<LlmClient> clientList,
                      LlmProperties properties,
@@ -48,8 +49,8 @@ public class AiGateway {
     }
 
     /**
-     * Генерация ответа через AI Gateway.
-     * При ошибке основного провайдера — автоматический fallback на внутренний.
+     * Р“РµРЅРµСЂР°С†РёСЏ РѕС‚РІРµС‚Р° С‡РµСЂРµР· AI Gateway.
+     * РџСЂРё РѕС€РёР±РєРµ РѕСЃРЅРѕРІРЅРѕРіРѕ РїСЂРѕРІР°Р№РґРµСЂР° вЂ” Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ fallback РЅР° РІРЅСѓС‚СЂРµРЅРЅРёР№.
      */
     public LlmResponse generate(LlmRequest request) {
         String activeProvider = resolveActiveProvider();
@@ -63,13 +64,15 @@ public class AiGateway {
         log.info("AI Gateway routing | provider={} | requestMaxTokens={}", activeProvider, request.maxTokens());
 
         try {
-            LlmResponse response = client.generate(request);
-            recordSuccess(activeProvider);
+            long start = System.nanoTime();
+            LlmResponse raw = client.generate(request);
+            recordLatency(activeProvider, System.nanoTime() - start);
+            recordOutcome(activeProvider, "success");
             resetCircuitBreaker();
-            return response;
+            return raw;
 
         } catch (LlmUnavailableException e) {
-            recordFailure(activeProvider);
+            recordOutcome(activeProvider, "error");
             log.warn("Primary provider failed, attempting fallback | failed={} | error={}",
                     activeProvider, e.getMessage());
 
@@ -78,14 +81,20 @@ public class AiGateway {
     }
 
     /**
-     * Определение активного провайдера с учётом Circuit Breaker.
+     * РћРїСЂРµРґРµР»РµРЅРёРµ Р°РєС‚РёРІРЅРѕРіРѕ РїСЂРѕРІР°Р№РґРµСЂР° СЃ СѓС‡С‘С‚РѕРј Circuit Breaker.
      */
     private String resolveActiveProvider() {
         if (primaryFailed && isCircuitBreakerActive()) {
             log.info("Circuit breaker active: routing to fallback provider");
             return properties.getFallbackProvider();
         }
-        return properties.getActiveProvider();
+        String active = properties.getActiveProvider();
+        // Р•СЃР»Рё РѕСЃРЅРѕРІРЅРѕР№ РїСЂРѕРІР°Р№РґРµСЂ РїРѕРјРµС‡РµРЅ РЅРµРґРѕСЃС‚СѓРїРЅС‹Рј, РЅРѕ С‚Р°Р№РјР°СѓС‚ Р±Р»РѕРєР°С‚РѕСЂР° РёСЃС‚С‘Рє вЂ”
+        // СЃР±СЂР°СЃС‹РІР°РµРј СЃРѕСЃС‚РѕСЏРЅРёРµ Рё РїСЂРѕР±СѓРµРј СЃРЅРѕРІР° (half-open).
+        if (primaryFailed) {
+            resetCircuitBreaker();
+        }
+        return active;
     }
 
     private boolean isCircuitBreakerActive() {
@@ -93,7 +102,7 @@ public class AiGateway {
     }
 
     /**
-     * Fallback: переключение на резервного провайдера.
+     * Fallback: РїРµСЂРµРєР»СЋС‡РµРЅРёРµ РЅР° СЂРµР·РµСЂРІРЅРѕРіРѕ РїСЂРѕРІР°Р№РґРµСЂР°.
      */
     private LlmResponse executeFallback(LlmRequest request, String failedProvider, Exception cause) {
         String fallbackProvider = properties.getFallbackProvider();
@@ -101,27 +110,39 @@ public class AiGateway {
 
         if (fallbackClient == null || fallbackProvider.equals(failedProvider)) {
             log.error("No fallback provider available | failed={}", failedProvider);
-            return LlmResponse.fallback(
-                    "Сервис временно недоступен. Ваш вопрос зафиксирован, ответ будет предоставлен в ближайшее время.",
-                    failedProvider
-            );
+            activateCircuitBreaker();
+            return degradedResponse(failedProvider);
         }
 
         try {
             log.info("Fallback execution | provider={}", fallbackProvider);
+            long start = System.nanoTime();
             LlmResponse response = fallbackClient.generate(request);
-            recordSuccess(fallbackProvider);
+            recordLatency(fallbackProvider, System.nanoTime() - start);
+            recordOutcome(fallbackProvider, "success_fallback");
             activateCircuitBreaker();
-            return response;
+            return markAsFallback(response);
 
         } catch (Exception fallbackEx) {
-            recordFailure(fallbackProvider);
+            recordOutcome(fallbackProvider, "error");
             log.error("Fallback also failed | provider={} | error={}", fallbackProvider, fallbackEx.getMessage());
-            return LlmResponse.fallback(
-                    "Сервис временно недоступен. Пожалуйста, обратитесь в регистратуру по телефону.",
-                    fallbackProvider
-            );
+            activateCircuitBreaker();
+            return degradedResponse(fallbackProvider);
         }
+    }
+
+    /** Р‘РµР·РѕРїР°СЃРЅРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ РїСЂРё РїРѕР»РЅРѕР№ РЅРµРґРѕСЃС‚СѓРїРЅРѕСЃС‚Рё LLM (Р±РµР· РџР”, Р±РµР· РґРёР°РіРЅРѕР·РѕРІ). */
+    private LlmResponse degradedResponse(String provider) {
+        return LlmResponse.fallback(
+                "РЎРµСЂРІРёСЃ РІСЂРµРјРµРЅРЅРѕ РЅРµРґРѕСЃС‚СѓРїРµРЅ. Р’Р°С€ РІРѕРїСЂРѕСЃ Р·Р°С„РёРєСЃРёСЂРѕРІР°РЅ, "
+                        + "РїРѕР¶Р°Р»СѓР№СЃС‚Р°, РѕР±СЂР°С‚РёС‚РµСЃСЊ РІ СЂРµРіРёСЃС‚СЂР°С‚СѓСЂСѓ РїРѕ С‚РµР»РµС„РѕРЅСѓ.",
+                provider
+        );
+    }
+
+    /** РџРѕРјРµС‡Р°РµС‚ РѕС‚РІРµС‚ РєР°Рє РїРѕР»СѓС‡РµРЅРЅС‹Р№ С‡РµСЂРµР· fallback-РїСЂРѕРІР°Р№РґРµСЂР°. */
+    private LlmResponse markAsFallback(LlmResponse response) {
+        return new LlmResponse(response.text(), response.provider(), true, response.latencyMs());
     }
 
     private void activateCircuitBreaker() {
@@ -133,23 +154,23 @@ public class AiGateway {
     private void resetCircuitBreaker() {
         if (primaryFailed) {
             primaryFailed = false;
-            log.info("Circuit breaker reset — primary provider restored");
+            log.info("Circuit breaker reset вЂ” primary provider restored");
         }
     }
 
-    private void recordSuccess(String provider) {
+    private void recordOutcome(String provider, String status) {
         Counter.builder("llm.requests.total")
                 .tag("provider", provider)
-                .tag("status", "success")
+                .tag("status", status)
                 .register(meterRegistry)
                 .increment();
     }
 
-    private void recordFailure(String provider) {
-        Counter.builder("llm.requests.total")
+    private void recordLatency(String provider, long nanos) {
+        io.micrometer.core.instrument.Timer.builder("llm.request.duration")
                 .tag("provider", provider)
-                .tag("status", "error")
+                .description("Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ РѕР±СЂР°С‰РµРЅРёСЏ Рє LLM-РїСЂРѕРІР°Р№РґРµСЂСѓ")
                 .register(meterRegistry)
-                .increment();
+                .record(Duration.ofNanos(nanos));
     }
 }

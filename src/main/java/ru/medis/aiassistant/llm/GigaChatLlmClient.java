@@ -16,7 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Реализация LlmClient для GigaChat API (SberCloud).
+ * Р РµР°Р»РёР·Р°С†РёСЏ LlmClient РґР»СЏ GigaChat API (SberCloud).
  *
  * GigaChat API:
  *   POST https://gigachat.devices.sberbank.ru/api/v1/chat/completions
@@ -40,7 +40,7 @@ public class GigaChatLlmClient implements LlmClient {
         this.properties = properties;
         this.requestTimer = Timer.builder("llm.request.duration")
                 .tag("provider", PROVIDER_NAME)
-                .description("Время запроса к LLM")
+                .description("Р’СЂРµРјСЏ Р·Р°РїСЂРѕСЃР° Рє LLM")
                 .register(meterRegistry);
     }
 
@@ -52,15 +52,15 @@ public class GigaChatLlmClient implements LlmClient {
         log.info("LLM request initiated | provider={} | sessionId={} | maxTokens={} | temperature={}",
                 PROVIDER_NAME, sessionId, request.maxTokens(), request.temperature());
 
-        // НЕ логируем содержимое prompt — может содержать персональные данные пациента
+        // РќР• Р»РѕРіРёСЂСѓРµРј СЃРѕРґРµСЂР¶РёРјРѕРµ prompt вЂ” РјРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ РїРµСЂСЃРѕРЅР°Р»СЊРЅС‹Рµ РґР°РЅРЅС‹Рµ РїР°С†РёРµРЅС‚Р°
         log.debug("LLM request metadata: {}", request.metadata());
 
         try {
-            long elapsed = requestTimer.record(() -> {
-                // Формирование тела запроса в формате GigaChat API
+            GigaChatResponse chatResponse = requestTimer.record(() -> {
+                // Р¤РѕСЂРјРёСЂРѕРІР°РЅРёРµ С‚РµР»Р° Р·Р°РїСЂРѕСЃР° РІ С„РѕСЂРјР°С‚Рµ GigaChat API
                 Map<String, Object> body = buildGigaChatRequestBody(request);
 
-                GigaChatResponse response = restClient.post()
+                return restClient.post()
                         .uri("/api/v1/chat/completions")
                         .header("Authorization", "Bearer " + properties.getGigachat().getAccessToken())
                         .header("X-Session-ID", sessionId)
@@ -68,12 +68,10 @@ public class GigaChatLlmClient implements LlmClient {
                         .body(body)
                         .retrieve()
                         .body(GigaChatResponse.class);
-
-                return response;
             });
 
             long latency = System.currentTimeMillis() - startTime;
-            String text = extractText(elapsed);
+            String text = extractText(chatResponse);
 
             log.info("LLM response received | provider={} | sessionId={} | latency={}ms | textLength={}",
                     PROVIDER_NAME, sessionId, latency, text != null ? text.length() : 0);
@@ -129,7 +127,7 @@ public class GigaChatLlmClient implements LlmClient {
         return response.choices().get(0).message().content();
     }
 
-    // Внутренние DTO для GigaChat API
+    // Р’РЅСѓС‚СЂРµРЅРЅРёРµ DTO РґР»СЏ GigaChat API
     record GigaChatResponse(List<Choice> choices) {}
     record Choice(Message message) {}
     record Message(String role, String content) {}
