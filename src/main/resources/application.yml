@@ -1,19 +1,24 @@
-server:
-  port: 8080
-
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: medis-ai-assistant
+
+server:
+  port: 8080
 
 llm:
   active-provider: ${LLM_ACTIVE_PROVIDER:gigachat}
   fallback-provider: ${LLM_FALLBACK_PROVIDER:internal}
   gigachat:
     base-url: ${GIGACHAT_BASE_URL:https://gigachat.devices.sberbank.ru}
-    client-id: ${GIGACHAT_CLIENT_ID:}
-    client-secret: ${GIGACHAT_CLIENT_SECRET:}
+    oauth-url: ${GIGACHAT_OAUTH_URL:https://ngw.devices.sberbank.ru:9443/api/v2/oauth}
+    credentials: ${GIGACHAT_CREDENTIALS:}
+    scope: ${GIGACHAT_SCOPE:GIGACHAT_API_PERS}
+    client-id: ${GIGACHAT_CLIENT_ID:${Client_ID:}}
+    client-secret: ${GIGACHAT_CLIENT_SECRET:${CLIENT_SECRET:}}
     access-token: ${GIGACHAT_ACCESS_TOKEN:}
-    model: ${GIGACHAT_MODEL:GigaChat}
+    model: ${GIGACHAT_MODEL:GigaChat-3-Ultra}
     timeout: 10s
     retries: 2
   internal:
