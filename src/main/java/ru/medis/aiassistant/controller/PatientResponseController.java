@@ -14,6 +14,7 @@ import ru.medis.aiassistant.service.PatientResponseService;
  */
 @RestController
 @RequestMapping("/api/v1/patient")
+@CrossOrigin(origins = "http://localhost:5500")
 public class PatientResponseController {
 
     private final PatientResponseService service;
