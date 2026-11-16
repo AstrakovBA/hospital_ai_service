@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f4">
+  <title>МедАссист — ответы пациентам</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="МедАссист, главная">
+      <span class="brand-mark" aria-hidden="true">+</span>
+      <span>мед<span class="brand-accent">ассист</span></span>
+    </a>
+    <span class="topbar-note"><span class="status-dot"></span> Помощник регистратуры</span>
+  </header>
+
+  <main class="layout">
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">ИНСТРУМЕНТ ДЛЯ СОТРУДНИКОВ КЛИНИКИ</p>
+      <h1 id="page-title">Ответ пациенту —<br><span>за пару секунд</span></h1>
+      <p class="intro-copy">Сформируйте вежливый черновик ответа на организационный вопрос. Проверьте текст перед отправкой пациенту.</p>
+      <div class="privacy-note">
+        <span class="privacy-icon" aria-hidden="true">i</span>
+        <p>Не указывайте диагнозы, результаты анализов и другие медицинские данные.</p>
+      </div>
+      <div class="decoration" aria-hidden="true">
+        <span class="decor-cross">+</span>
+        <span class="decor-ring"></span>
+        <span class="decor-dot"></span>
+      </div>
+    </section>
+
+    <section class="workspace" aria-label="Создание черновика ответа">
+      <form class="question-card" id="question-form">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">НОВЫЙ ЗАПРОС</p>
+            <h2>О чём спрашивает пациент?</h2>
+          </div>
+          <span class="step-number">01</span>
+        </div>
+
+        <label for="category">Тема обращения <span class="required">*</span></label>
+        <select id="category" name="category" required>
+          <option value="ЗАПИСЬ">Запись на приём</option>
+          <option value="ДОКУМЕНТЫ">Документы для приёма</option>
+          <option value="РАСПИСАНИЕ">Расписание</option>
+          <option value="ОПЛАТА">Оплата, ОМС, ДМС</option>
+          <option value="НАПРАВЛЕНИЕ">Направление к специалисту</option>
+          <option value="РЕЗУЛЬТАТЫ">Готовность результатов анализов</option>
+          <option value="ОБЩЕЕ">Общий вопрос</option>
+        </select>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="patient-name">Имя пациента <span class="optional">необязательно</span></label>
+            <input id="patient-name" name="patientName" type="text" maxlength="200" placeholder="Например, Анна">
+          </div>
+          <div class="field">
+            <label for="clinic-name">Название клиники <span class="optional">необязательно</span></label>
+            <input id="clinic-name" name="clinicName" type="text" maxlength="200" placeholder="Например, Медцентр">
+          </div>
+        </div>
+
+        <div class="question-label">
+          <label for="patient-question">Вопрос пациента <span class="required">*</span></label>
+          <span class="counter" id="question-counter">0 / 2000</span>
+        </div>
+        <textarea id="patient-question" name="patientQuestion" required maxlength="2000"
+                  placeholder="Например: Здравствуйте! Подскажите, пожалуйста, как перенести запись к терапевту на следующую неделю?"></textarea>
+
+        <div class="form-footer">
+          <span class="required-hint"><span class="required">*</span> Обязательное поле</span>
+          <button class="submit-button" id="submit-button" type="submit">
+            <span class="button-label">Составить черновик</span>
+            <span class="button-arrow" aria-hidden="true">→</span>
+          </button>
+        </div>
+      </form>
+
+      <section class="result-card" id="result-card" aria-live="polite" aria-atomic="true" hidden>
+        <div class="result-heading">
+          <div>
+            <p class="eyebrow">ЧЕРНОВИК ГОТОВ</p>
+            <h2>Ответ пациенту</h2>
+          </div>
+          <span class="result-check" aria-hidden="true">✓</span>
+        </div>
+        <div class="result-meta" id="result-meta"></div>
+        <p class="answer-text" id="answer-text"></p>
+        <div class="disclaimer">
+          <span aria-hidden="true">ⓘ</span>
+          <p id="disclaimer-text"></p>
+        </div>
+        <button class="copy-button" id="copy-button" type="button">Скопировать ответ</button>
+      </section>
+
+      <div class="error-message" id="error-message" role="alert" hidden></div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <span>МедАссист <span aria-hidden="true">·</span> Рабочий инструмент для регистратуры</span>
+    <span>Все ответы необходимо проверить перед отправкой</span>
+  </footer>
+</body>
+</html>
