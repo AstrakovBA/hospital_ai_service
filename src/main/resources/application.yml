@@ -1,0 +1,34 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: medis-ai-assistant
+
+llm:
+  active-provider: gigachat
+  fallback-provider: internal
+  gigachat:
+    base-url: ${GIGACHAT_BASE_URL:https://gigachat.devices.sberbank.ru}
+    client-id: ${GIGACHAT_CLIENT_ID}
+    client-secret: ${CLIENT_SECRET}
+    access-token: ${GIGACHAT_CREDENTIALS:}
+    model: ${GIGACHAT_MODEL}
+    timeout: 10s
+    retries: 2
+  internal:
+    timeout: 5s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics, info
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    ru.medis.aiassistant: INFO
+    ru.medis.aiassistant.llm: DEBUG
